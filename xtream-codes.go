@@ -120,7 +120,7 @@ func (c *XtreamClient) GetStreamURL(streamID int, wantedFormat string) (string, 
 
 	stream := c.streams[streamID]
 
-	return fmt.Sprintf("%s/%s/%s/%s/%d.%s", c.BaseURL, stream.Type, c.Username, c.Password, stream.ID, wantedFormat), nil
+	return fmt.Sprintf("%s/%s/%s/%s/%d.%s", c.BaseURL, stream.Type, c.Username, c.Password, stream.ID.Int64(), wantedFormat), nil
 }
 
 // GetLiveCategories will return a slice of categories for live streams.
@@ -195,7 +195,7 @@ func (c *XtreamClient) GetStreams(streamAction, categoryID string) ([]Stream, er
 	}
 
 	for _, stream := range streams {
-		c.streams[int(stream.ID)] = stream
+		c.streams[stream.ID.Int()] = stream
 	}
 
 	return streams, nil

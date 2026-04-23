@@ -6,7 +6,6 @@ package xtreamcodes
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -28,11 +27,11 @@ func walkFunc(path string, f os.FileInfo, err error) error {
 	if f.IsDir() || f.Name() == "testData" {
 		return nil
 	}
-	bytes, err := ioutil.ReadFile(path) // path is the path to the file.
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	splitPath := strings.Split(path, "/")
+	splitPath := strings.Split(filepath.ToSlash(path), "/")
 	if expectedContents[f.Name()] == nil {
 		expectedContents[f.Name()] = make(map[string][]byte)
 	}

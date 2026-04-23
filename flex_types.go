@@ -70,49 +70,72 @@ func (bit *ConvertibleBoolean) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// FlexInt is a int64 which unmarshals from JSON
-// as either unquoted or quoted (with any amount
-// of internal leading/trailing whitespace).
-// Originally found at https://bit.ly/2NkJ0SK and
-// https://play.golang.org/p/KNPxDL1yqL
-type FlexInt int64
+// FlexInt unmarshals from JSON as either a quoted or unquoted integer,
+// preserving the original quoting form so round-trip marshaling is faithful.
+type FlexInt struct {
+	value  int64
+	quoted bool
+}
+
+// NewFlexInt creates a FlexInt from an int64 value.
+func NewFlexInt(v int64) FlexInt { return FlexInt{value: v} }
+
+// Int64 returns the underlying int64 value.
+func (f FlexInt) Int64() int64 { return f.value }
+
+// Int returns the underlying value as int.
+func (f FlexInt) Int() int { return int(f.value) }
 
 func (f FlexInt) MarshalJSON() ([]byte, error) {
-	return json.Marshal(int64(f))
+	if f.quoted {
+		return []byte(`"` + strconv.FormatInt(f.value, 10) + `"`), nil
+	}
+	return json.Marshal(f.value)
 }
 
 func (f *FlexInt) UnmarshalJSON(data []byte) error {
-	var v int64
-
+	data = bytes.TrimSpace(data)
+	f.quoted = len(data) > 0 && data[0] == '"'
 	data = bytes.Trim(data, `" `)
-
-	err := json.Unmarshal(data, &v)
-	*f = FlexInt(v)
-	return err
+	return json.Unmarshal(data, &f.value)
 }
 
-type FlexFloat float64
+// FlexFloat unmarshals from JSON as either a quoted or unquoted float,
+// preserving the original quoting form so round-trip marshaling is faithful.
+type FlexFloat struct {
+	value  float64
+	quoted bool
+}
+
+// Float64 returns the underlying float64 value.
+func (ff FlexFloat) Float64() float64 { return ff.value }
+
+func (ff FlexFloat) MarshalJSON() ([]byte, error) {
+	if ff.quoted {
+		return []byte(`"` + strconv.FormatFloat(ff.value, 'f', -1, 64) + `"`), nil
+	}
+	return json.Marshal(ff.value)
+}
 
 func (ff *FlexFloat) UnmarshalJSON(b []byte) error {
-	if b[0] != '"' {
-		return json.Unmarshal(b, (*float64)(ff))
+	b = bytes.TrimSpace(b)
+	ff.quoted = len(b) > 0 && b[0] == '"'
+	if ff.quoted {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		if len(s) == 0 {
+			s = "0"
+		}
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			f = 0
+		}
+		ff.value = f
+		return nil
 	}
-
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-
-	if len(s) == 0 {
-		s = "0"
-	}
-
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		f = 0
-	}
-	*ff = FlexFloat(f)
-	return nil
+	return json.Unmarshal(b, &ff.value)
 }
 
 // JSONStringSlice is a struct containing a slice of strings.
