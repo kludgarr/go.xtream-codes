@@ -1,5 +1,7 @@
 package xtreamcodes
 
+import "encoding/json"
+
 // TODO: Add more flex types on IDs if needed
 // for future potential provider issues.
 
@@ -52,22 +54,26 @@ type Category struct {
 
 // Stream is a streamble video source.
 type Stream struct {
-	Added              *Timestamp `json:"added"`
-	CategoryID         FlexInt    `json:"category_id"`
-	CategoryName       string     `json:"category_name"`
-	ContainerExtension string     `json:"container_extension"`
-	CustomSid          string     `json:"custom_sid"`
-	DirectSource       string     `json:"direct_source,omitempty"`
-	EPGChannelID       string     `json:"epg_channel_id"`
-	Icon               string     `json:"stream_icon"`
-	ID                 FlexInt    `json:"stream_id"`
-	Name               string     `json:"name"`
-	Number             FlexInt    `json:"num"`
-	Rating             FlexFloat  `json:"rating"`
-	Rating5based       FlexFloat  `json:"rating_5based"`
-	TVArchive          FlexInt    `json:"tv_archive"`
-	TVArchiveDuration  *FlexInt   `json:"tv_archive_duration"`
-	Type               string     `json:"stream_type"`
+	Added              *Timestamp         `json:"added"`
+	CategoryID         FlexInt            `json:"category_id"`
+	CategoryIDs        []FlexInt          `json:"category_ids,omitempty"`
+	CategoryName       string             `json:"category_name"`
+	ContainerExtension string             `json:"container_extension"`
+	CustomSid          string             `json:"custom_sid"`
+	DirectSource       string             `json:"direct_source,omitempty"`
+	EPGChannelID       string             `json:"epg_channel_id"`
+	Icon               string             `json:"stream_icon"`
+	ID                 FlexInt            `json:"stream_id"`
+	IsAdult            ConvertibleBoolean `json:"is_adult"`
+	Name               string             `json:"name"`
+	Number             FlexInt            `json:"num"`
+	Rating             FlexFloat          `json:"rating"`
+	Rating5based       FlexFloat          `json:"rating_5based"`
+	TmdbID             FlexInt            `json:"tmdb,omitempty"`
+	Trailer            string             `json:"trailer,omitempty"`
+	TVArchive          FlexInt            `json:"tv_archive"`
+	TVArchiveDuration  *FlexInt           `json:"tv_archive_duration"`
+	Type               string             `json:"stream_type"`
 }
 
 // SeriesInfo contains information about a TV series.
@@ -75,9 +81,10 @@ type SeriesInfo struct {
 	BackdropPath   *JSONStringSlice `json:"backdrop_path,omitempty"`
 	Cast           string           `json:"cast"`
 	CategoryID     *FlexInt         `json:"category_id"`
+	CategoryIDs    []FlexInt        `json:"category_ids,omitempty"`
 	Cover          string           `json:"cover"`
 	Director       string           `json:"director"`
-	EpisodeRunTime string           `json:"episode_run_time"`
+	EpisodeRunTime FlexInt          `json:"episode_run_time"`
 	Genre          string           `json:"genre"`
 	LastModified   *Timestamp       `json:"last_modified,omitempty"`
 	Name           string           `json:"name"`
@@ -88,66 +95,132 @@ type SeriesInfo struct {
 	ReleaseDate    string           `json:"releaseDate"`
 	SeriesID       FlexInt          `json:"series_id"`
 	StreamType     string           `json:"stream_type"`
+	TmdbID         FlexInt          `json:"tmdb,omitempty"`
 	YoutubeTrailer string           `json:"youtube_trailer"`
 }
 
+// seriesInfoAlias prevents UnmarshalJSON recursion.
+type seriesInfoAlias SeriesInfo
+
+// UnmarshalJSON normalises the two release-date key variants providers emit
+// (releaseDate and release_date) into a single ReleaseDate field.
+func (s *SeriesInfo) UnmarshalJSON(b []byte) error {
+	type wire struct {
+		*seriesInfoAlias
+		ReleaseDateSnake string `json:"release_date"`
+	}
+	w := wire{seriesInfoAlias: (*seriesInfoAlias)(s)}
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	if s.ReleaseDate == "" {
+		s.ReleaseDate = w.ReleaseDateSnake
+	}
+	return nil
+}
+
+// EpisodeInfo contains the metadata block embedded within a SeriesEpisode.
+type EpisodeInfo struct {
+	MovieImage     string    `json:"movie_image"`
+	MovieImageTmdb string    `json:"movie_image_tmdb,omitempty"`
+	Plot           string    `json:"plot"`
+	Rating         FlexFloat `json:"rating"`
+	ReleaseDate    string    `json:"releasedate"`
+	TmdbID         FlexInt   `json:"tmdb_id,omitempty"`
+}
+
 type SeriesEpisode struct {
-	Added              string  `json:"added"`
-	ContainerExtension string  `json:"container_extension"`
-	CustomSid          string  `json:"custom_sid"`
-	DirectSource       string  `json:"direct_source"`
-	EpisodeNum         FlexInt `json:"episode_num"`
-	ID                 string  `json:"id"`
-	Info               struct {
-		Audio        FFMPEGStreamInfo `json:"audio"`
-		Bitrate      FlexInt          `json:"bitrate"`
-		Duration     string           `json:"duration"`
-		DurationSecs FlexInt          `json:"duration_secs"`
-		MovieImage   string           `json:"movie_image"`
-		Name         string           `json:"name"`
-		Plot         string           `json:"plot"`
-		Rating       FlexFloat        `json:"rating"`
-		ReleaseDate  string           `json:"releasedate"`
-		Video        FFMPEGStreamInfo `json:"video"`
-	} `json:"info"`
-	Season FlexInt `json:"season"`
-	Title  string  `json:"title"`
+	Added              Timestamp   `json:"added"`
+	ContainerExtension string      `json:"container_extension"`
+	CustomSid          string      `json:"custom_sid"`
+	DirectSource       string      `json:"direct_source"`
+	EpisodeNum         FlexInt     `json:"episode_num"`
+	ID                 string      `json:"id"`
+	Info               EpisodeInfo `json:"info"`
+	Season             FlexInt     `json:"season"`
+	Title              string      `json:"title"`
+}
+
+// Season describes a single season within a series.
+type Season struct {
+	AirDate      string  `json:"air_date"`
+	Cover        string  `json:"cover"`
+	CoverBig     string  `json:"cover_big"`
+	CoverTmdb    string  `json:"cover_tmdb"`
+	Duration     FlexInt `json:"duration"`
+	EpisodeCount FlexInt `json:"episode_count"`
+	Name         string  `json:"name"`
+	Overview     string  `json:"overview"`
+	ReleaseDate  string  `json:"releaseDate"`
+	SeasonNumber FlexInt `json:"season_number"`
+}
+
+// seasonAlias prevents UnmarshalJSON recursion.
+type seasonAlias Season
+
+// UnmarshalJSON normalises the two release-date key variants into ReleaseDate.
+func (s *Season) UnmarshalJSON(b []byte) error {
+	type wire struct {
+		*seasonAlias
+		ReleaseDateSnake string `json:"release_date"`
+	}
+	w := wire{seasonAlias: (*seasonAlias)(s)}
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	if s.ReleaseDate == "" {
+		s.ReleaseDate = w.ReleaseDateSnake
+	}
+	return nil
 }
 
 type Series struct {
 	Episodes map[string][]SeriesEpisode `json:"episodes"`
 	Info     SeriesInfo                 `json:"info"`
-	Seasons  []interface{}              `json:"seasons"`
+	Seasons  []Season                   `json:"seasons"`
+}
+
+// VODInfo is the metadata block within a VideoOnDemandInfo response.
+type VODInfo struct {
+	Actors         string    `json:"actors"`
+	Age            string    `json:"age"`
+	BackdropPath   []string  `json:"backdrop_path"`
+	Bitrate        FlexInt   `json:"bitrate"`
+	Cast           string    `json:"cast"`
+	Country        string    `json:"country"`
+	CoverBig       string    `json:"cover_big"`
+	Description    string    `json:"description"`
+	Director       string    `json:"director"`
+	Duration       string    `json:"duration"`
+	DurationSecs   FlexInt   `json:"duration_secs"`
+	Genre          string    `json:"genre"`
+	MovieImage     string    `json:"movie_image"`
+	Name           string    `json:"name"`
+	OriginalName   string    `json:"o_name"`
+	Plot           string    `json:"plot"`
+	Rating         FlexFloat `json:"rating"`
+	ReleaseDate    string    `json:"releasedate"`
+	Status         string    `json:"status"`
+	TmdbID         FlexInt   `json:"tmdb_id"`
+	YoutubeTrailer string    `json:"youtube_trailer"`
+}
+
+// VODMovieData is the stream identity block within a VideoOnDemandInfo response.
+type VODMovieData struct {
+	Added              Timestamp `json:"added"`
+	CategoryID         FlexInt   `json:"category_id"`
+	CategoryIDs        []FlexInt `json:"category_ids,omitempty"`
+	ContainerExtension string    `json:"container_extension"`
+	CustomSid          string    `json:"custom_sid"`
+	DirectSource       string    `json:"direct_source"`
+	Name               string    `json:"name"`
+	StreamID           FlexInt   `json:"stream_id"`
 }
 
 // VideoOnDemandInfo contains information about a video on demand stream.
 type VideoOnDemandInfo struct {
-	Info struct {
-		Audio          FFMPEGStreamInfo `json:"audio"`
-		BackdropPath   []string         `json:"backdrop_path"`
-		Bitrate        FlexInt          `json:"bitrate"`
-		Cast           string           `json:"cast"`
-		Director       string           `json:"director"`
-		Duration       string           `json:"duration"`
-		DurationSecs   FlexInt          `json:"duration_secs"`
-		Genre          string           `json:"genre"`
-		MovieImage     string           `json:"movie_image"`
-		Plot           string           `json:"plot"`
-		Rating         FlexFloat        `json:"rating"`
-		ReleaseDate    string           `json:"releasedate"`
-		TmdbID         FlexInt          `json:"tmdb_id"`
-		Video          FFMPEGStreamInfo `json:"video"`
-		YoutubeTrailer string           `json:"youtube_trailer"`
-	} `json:"info"`
-	MovieData struct {
-		Added              Timestamp `json:"added"`
-		CategoryID         FlexInt   `json:"category_id"`
-		ContainerExtension string    `json:"container_extension"`
-		CustomSid          string    `json:"custom_sid"`
-		DirectSource       string    `json:"direct_source"`
-		Name               string    `json:"name"`
-		StreamID           FlexInt   `json:"stream_id"`
-	} `json:"movie_data"`
+	Info      VODInfo      `json:"info"`
+	MovieData VODMovieData `json:"movie_data"`
 }
 
 type epgContainer struct {

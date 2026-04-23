@@ -41,6 +41,17 @@ type ConvertibleBoolean struct {
 	quoted bool
 }
 
+// Bool returns the underlying bool value.
+func (bit ConvertibleBoolean) Bool() bool { return bit.bool }
+
+// String implements fmt.Stringer.
+func (bit ConvertibleBoolean) String() string {
+	if bit.bool {
+		return "true"
+	}
+	return "false"
+}
+
 // MarshalJSON returns a 0 or 1 depending on bool state.
 func (bit ConvertibleBoolean) MarshalJSON() ([]byte, error) {
 	var bitSetVar int8
@@ -58,13 +69,13 @@ func (bit ConvertibleBoolean) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON converts a 0, 1, true or false into a bool
 func (bit *ConvertibleBoolean) UnmarshalJSON(data []byte) error {
 	bit.quoted = strings.Contains(string(data), `"`)
-	// Bools as ints are sometimes quoted, sometimes not, lets just always remove quotes just in case...
-	asString := strings.Replace(string(data), `"`, "", -1)
-	if asString == "1" || asString == "true" {
+	asString := strings.ReplaceAll(string(data), `"`, "")
+	switch asString {
+	case "1", "true":
 		bit.bool = true
-	} else if asString == "0" || asString == "false" {
+	case "0", "false":
 		bit.bool = false
-	} else {
+	default:
 		return fmt.Errorf("Boolean unmarshal error: invalid input %s", asString)
 	}
 	return nil
@@ -86,6 +97,9 @@ func (f FlexInt) Int64() int64 { return f.value }
 // Int returns the underlying value as int.
 func (f FlexInt) Int() int { return int(f.value) }
 
+// String implements fmt.Stringer.
+func (f FlexInt) String() string { return strconv.FormatInt(f.value, 10) }
+
 func (f FlexInt) MarshalJSON() ([]byte, error) {
 	if f.quoted {
 		return []byte(`"` + strconv.FormatInt(f.value, 10) + `"`), nil
@@ -97,7 +111,14 @@ func (f *FlexInt) UnmarshalJSON(data []byte) error {
 	data = bytes.TrimSpace(data)
 	f.quoted = len(data) > 0 && data[0] == '"'
 	data = bytes.Trim(data, `" `)
-	return json.Unmarshal(data, &f.value)
+	if len(data) == 0 {
+		f.value = 0
+		return nil
+	}
+	if err := json.Unmarshal(data, &f.value); err != nil {
+		f.value = 0
+	}
+	return nil
 }
 
 // FlexFloat unmarshals from JSON as either a quoted or unquoted float,
@@ -109,6 +130,9 @@ type FlexFloat struct {
 
 // Float64 returns the underlying float64 value.
 func (ff FlexFloat) Float64() float64 { return ff.value }
+
+// String implements fmt.Stringer.
+func (ff FlexFloat) String() string { return strconv.FormatFloat(ff.value, 'f', -1, 64) }
 
 func (ff FlexFloat) MarshalJSON() ([]byte, error) {
 	if ff.quoted {
