@@ -124,12 +124,22 @@ func (s *SeriesInfo) UnmarshalJSON(b []byte) error {
 
 // EpisodeInfo contains the metadata block embedded within a SeriesEpisode.
 type EpisodeInfo struct {
-	MovieImage     string    `json:"movie_image"`
-	MovieImageTmdb string    `json:"movie_image_tmdb,omitempty"`
-	Plot           string    `json:"plot"`
-	Rating         FlexFloat `json:"rating"`
-	ReleaseDate    string    `json:"releasedate"`
-	TmdbID         FlexInt   `json:"tmdb_id,omitempty"`
+	AirDate        string           `json:"air_date,omitempty"`
+	BackdropPath   *JSONStringSlice `json:"backdrop_path,omitempty"`
+	Bitrate        FlexInt          `json:"bitrate,omitempty"`
+	Crew           string           `json:"crew,omitempty"`
+	DirectedBy     string           `json:"directed_by,omitempty"`
+	Duration       string           `json:"duration,omitempty"`
+	DurationSecs   FlexInt          `json:"duration_secs,omitempty"`
+	ID             FlexInt          `json:"id,omitempty"`
+	MovieImage     string           `json:"movie_image"`
+	MovieImageTmdb string           `json:"movie_image_tmdb,omitempty"`
+	Name           string           `json:"name,omitempty"`
+	Overview       string           `json:"overview,omitempty"`
+	Plot           string           `json:"plot"`
+	Rating         FlexFloat        `json:"rating"`
+	ReleaseDate    string           `json:"releasedate"`
+	TmdbID         FlexInt          `json:"tmdb_id,omitempty"`
 }
 
 type SeriesEpisode struct {
