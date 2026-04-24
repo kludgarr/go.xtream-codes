@@ -223,6 +223,34 @@ type VideoOnDemandInfo struct {
 	MovieData VODMovieData `json:"movie_data"`
 }
 
+// UnmarshalJSON tolerates providers that emit "info": [] (empty array) when
+// the metadata block is absent for a given record — treat as a zero-value
+// VODInfo rather than failing the whole decode.
+func (v *VideoOnDemandInfo) UnmarshalJSON(b []byte) error {
+	type wire struct {
+		Info      json.RawMessage `json:"info"`
+		MovieData json.RawMessage `json:"movie_data"`
+	}
+	var w wire
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	if len(w.Info) > 0 {
+		if err := json.Unmarshal(w.Info, &v.Info); err != nil {
+			var placeholder []struct{}
+			if arrErr := json.Unmarshal(w.Info, &placeholder); arrErr != nil {
+				return err
+			}
+		}
+	}
+	if len(w.MovieData) > 0 {
+		if err := json.Unmarshal(w.MovieData, &v.MovieData); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type epgContainer struct {
 	EPGListings []EPGInfo `json:"epg_listings"`
 }
