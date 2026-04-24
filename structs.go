@@ -67,6 +67,7 @@ type Stream struct {
 	EPGChannelID       string             `json:"epg_channel_id"`
 	Icon               string             `json:"stream_icon"`
 	ID                 FlexInt            `json:"stream_id"`
+	ImdbID             string             `json:"imdb,omitempty"`
 	IsAdult            ConvertibleBoolean `json:"is_adult"`
 	Live               ConvertibleBoolean `json:"live"`
 	Name               string             `json:"name"`
@@ -76,10 +77,40 @@ type Stream struct {
 	SeriesNo           *FlexInt           `json:"series_no,omitempty"`
 	TmdbID             FlexInt            `json:"tmdb,omitempty"`
 	Trailer            string             `json:"trailer,omitempty"`
+	TvdbID             FlexInt            `json:"tvdb,omitempty"`
 	TVArchive          ConvertibleBoolean `json:"tv_archive"`
 	TVArchiveDuration  *FlexInt           `json:"tv_archive_duration"`
 	Type               string             `json:"stream_type"`
 	TypeName           string             `json:"type_name,omitempty"`
+}
+
+// streamAlias prevents UnmarshalJSON recursion.
+type streamAlias Stream
+
+// UnmarshalJSON accepts tmdb_id/imdb_id/tvdb_id as input aliases for the
+// canonical short-form tmdb/imdb/tvdb keys — ProviderC (Dispatcharr) emits
+// the long forms on stream records while A and B emit the short forms.
+func (s *Stream) UnmarshalJSON(b []byte) error {
+	type wire struct {
+		*streamAlias
+		TmdbIDAlt FlexInt `json:"tmdb_id"`
+		ImdbIDAlt string  `json:"imdb_id"`
+		TvdbIDAlt FlexInt `json:"tvdb_id"`
+	}
+	w := wire{streamAlias: (*streamAlias)(s)}
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	if s.TmdbID.Int64() == 0 {
+		s.TmdbID = w.TmdbIDAlt
+	}
+	if s.ImdbID == "" {
+		s.ImdbID = w.ImdbIDAlt
+	}
+	if s.TvdbID.Int64() == 0 {
+		s.TvdbID = w.TvdbIDAlt
+	}
+	return nil
 }
 
 // SeriesInfo contains information about a TV series.
@@ -93,6 +124,7 @@ type SeriesInfo struct {
 	Director       string           `json:"director"`
 	EpisodeRunTime FlexInt          `json:"episode_run_time"`
 	Genre          string           `json:"genre"`
+	ImdbID         string           `json:"imdb,omitempty"`
 	LastModified   *Timestamp       `json:"last_modified,omitempty"`
 	Name           string           `json:"name"`
 	Num            FlexInt          `json:"num"`
@@ -103,18 +135,25 @@ type SeriesInfo struct {
 	SeriesID       FlexInt          `json:"series_id"`
 	StreamType     string           `json:"stream_type"`
 	TmdbID         FlexInt          `json:"tmdb,omitempty"`
+	TvdbID         FlexInt          `json:"tvdb,omitempty"`
 	YoutubeTrailer string           `json:"youtube_trailer"`
 }
 
 // seriesInfoAlias prevents UnmarshalJSON recursion.
 type seriesInfoAlias SeriesInfo
 
-// UnmarshalJSON normalises the two release-date key variants providers emit
-// (releaseDate and release_date) into a single ReleaseDate field.
+// UnmarshalJSON coalesces provider key variants:
+//   - releaseDate / release_date — ProviderA/B emit releaseDate, C emits release_date
+//   - tmdb / tmdb_id, imdb / imdb_id, tvdb / tvdb_id — short form is canonical
+//     on this struct (matches ProviderA/B); long forms accepted for ProviderC
+//     compatibility (Dispatcharr emits _id-suffixed forms on the list shape).
 func (s *SeriesInfo) UnmarshalJSON(b []byte) error {
 	type wire struct {
 		*seriesInfoAlias
-		ReleaseDateSnake string `json:"release_date"`
+		ReleaseDateSnake string  `json:"release_date"`
+		TmdbIDAlt        FlexInt `json:"tmdb_id"`
+		ImdbIDAlt        string  `json:"imdb_id"`
+		TvdbIDAlt        FlexInt `json:"tvdb_id"`
 	}
 	w := wire{seriesInfoAlias: (*seriesInfoAlias)(s)}
 	if err := json.Unmarshal(b, &w); err != nil {
@@ -122,6 +161,15 @@ func (s *SeriesInfo) UnmarshalJSON(b []byte) error {
 	}
 	if s.ReleaseDate == "" {
 		s.ReleaseDate = w.ReleaseDateSnake
+	}
+	if s.TmdbID.Int64() == 0 {
+		s.TmdbID = w.TmdbIDAlt
+	}
+	if s.ImdbID == "" {
+		s.ImdbID = w.ImdbIDAlt
+	}
+	if s.TvdbID.Int64() == 0 {
+		s.TvdbID = w.TvdbIDAlt
 	}
 	return nil
 }
@@ -136,6 +184,7 @@ type EpisodeInfo struct {
 	Duration       string           `json:"duration,omitempty"`
 	DurationSecs   FlexInt          `json:"duration_secs,omitempty"`
 	ID             FlexInt          `json:"id,omitempty"`
+	ImdbID         string           `json:"imdb_id,omitempty"`
 	MovieImage     string           `json:"movie_image"`
 	MovieImageTmdb string           `json:"movie_image_tmdb,omitempty"`
 	Name           string           `json:"name,omitempty"`
@@ -144,6 +193,41 @@ type EpisodeInfo struct {
 	Rating         FlexFloat        `json:"rating"`
 	ReleaseDate    string           `json:"releasedate"`
 	TmdbID         FlexInt          `json:"tmdb_id,omitempty"`
+	TvdbID         FlexInt          `json:"tvdb_id,omitempty"`
+}
+
+// episodeInfoAlias prevents UnmarshalJSON recursion.
+type episodeInfoAlias EpisodeInfo
+
+// UnmarshalJSON coalesces provider key variants:
+//   - releasedate / release_date — struct uses releasedate; C emits release_date
+//   - tmdb / tmdb_id, imdb / imdb_id, tvdb / tvdb_id — long form is canonical
+//     on this struct; short forms accepted for cross-provider tolerance.
+func (e *EpisodeInfo) UnmarshalJSON(b []byte) error {
+	type wire struct {
+		*episodeInfoAlias
+		ReleaseDateSnake string  `json:"release_date"`
+		TmdbAlt          FlexInt `json:"tmdb"`
+		ImdbAlt          string  `json:"imdb"`
+		TvdbAlt          FlexInt `json:"tvdb"`
+	}
+	w := wire{episodeInfoAlias: (*episodeInfoAlias)(e)}
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	if e.ReleaseDate == "" {
+		e.ReleaseDate = w.ReleaseDateSnake
+	}
+	if e.TmdbID.Int64() == 0 {
+		e.TmdbID = w.TmdbAlt
+	}
+	if e.ImdbID == "" {
+		e.ImdbID = w.ImdbAlt
+	}
+	if e.TvdbID.Int64() == 0 {
+		e.TvdbID = w.TvdbAlt
+	}
+	return nil
 }
 
 type SeriesEpisode struct {
@@ -153,9 +237,40 @@ type SeriesEpisode struct {
 	DirectSource       string      `json:"direct_source"`
 	EpisodeNum         FlexInt     `json:"episode_num"`
 	ID                 FlexInt     `json:"id"`
+	ImdbID             string      `json:"imdb,omitempty"`
 	Info               EpisodeInfo `json:"info"`
 	Season             FlexInt     `json:"season"`
 	Title              string      `json:"title"`
+	TmdbID             FlexInt     `json:"tmdb,omitempty"`
+	TvdbID             FlexInt     `json:"tvdb,omitempty"`
+}
+
+// seriesEpisodeAlias prevents UnmarshalJSON recursion.
+type seriesEpisodeAlias SeriesEpisode
+
+// UnmarshalJSON accepts tmdb_id/imdb_id/tvdb_id as input aliases for the
+// canonical short-form tmdb/imdb/tvdb keys on this struct.
+func (s *SeriesEpisode) UnmarshalJSON(b []byte) error {
+	type wire struct {
+		*seriesEpisodeAlias
+		TmdbIDAlt FlexInt `json:"tmdb_id"`
+		ImdbIDAlt string  `json:"imdb_id"`
+		TvdbIDAlt FlexInt `json:"tvdb_id"`
+	}
+	w := wire{seriesEpisodeAlias: (*seriesEpisodeAlias)(s)}
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	if s.TmdbID.Int64() == 0 {
+		s.TmdbID = w.TmdbIDAlt
+	}
+	if s.ImdbID == "" {
+		s.ImdbID = w.ImdbIDAlt
+	}
+	if s.TvdbID.Int64() == 0 {
+		s.TvdbID = w.TvdbIDAlt
+	}
+	return nil
 }
 
 // Season describes a single season within a series.
@@ -166,20 +281,28 @@ type Season struct {
 	CoverTmdb    string  `json:"cover_tmdb"`
 	Duration     FlexInt `json:"duration"`
 	EpisodeCount FlexInt `json:"episode_count"`
+	ImdbID       string  `json:"imdb,omitempty"`
 	Name         string  `json:"name"`
 	Overview     string  `json:"overview"`
 	ReleaseDate  string  `json:"releaseDate"`
 	SeasonNumber FlexInt `json:"season_number"`
+	TmdbID       FlexInt `json:"tmdb,omitempty"`
+	TvdbID       FlexInt `json:"tvdb,omitempty"`
 }
 
 // seasonAlias prevents UnmarshalJSON recursion.
 type seasonAlias Season
 
-// UnmarshalJSON normalises the two release-date key variants into ReleaseDate.
+// UnmarshalJSON coalesces releaseDate/release_date into ReleaseDate and
+// accepts tmdb_id/imdb_id/tvdb_id as aliases for the canonical short-form
+// tmdb/imdb/tvdb keys on this struct.
 func (s *Season) UnmarshalJSON(b []byte) error {
 	type wire struct {
 		*seasonAlias
-		ReleaseDateSnake string `json:"release_date"`
+		ReleaseDateSnake string  `json:"release_date"`
+		TmdbIDAlt        FlexInt `json:"tmdb_id"`
+		ImdbIDAlt        string  `json:"imdb_id"`
+		TvdbIDAlt        FlexInt `json:"tvdb_id"`
 	}
 	w := wire{seasonAlias: (*seasonAlias)(s)}
 	if err := json.Unmarshal(b, &w); err != nil {
@@ -187,6 +310,15 @@ func (s *Season) UnmarshalJSON(b []byte) error {
 	}
 	if s.ReleaseDate == "" {
 		s.ReleaseDate = w.ReleaseDateSnake
+	}
+	if s.TmdbID.Int64() == 0 {
+		s.TmdbID = w.TmdbIDAlt
+	}
+	if s.ImdbID == "" {
+		s.ImdbID = w.ImdbIDAlt
+	}
+	if s.TvdbID.Int64() == 0 {
+		s.TvdbID = w.TvdbIDAlt
 	}
 	return nil
 }
@@ -213,6 +345,7 @@ type VODInfo struct {
 	DurationSecs   FlexInt   `json:"duration_secs"`
 	EpisodeRunTime *FlexInt  `json:"episode_run_time,omitempty"`
 	Genre          string    `json:"genre"`
+	ImdbID         string    `json:"imdb_id,omitempty"`
 	KinopoiskURL   string    `json:"kinopoisk_url,omitempty"`
 	MovieImage     string    `json:"movie_image"`
 	Name           string    `json:"name"`
@@ -223,8 +356,44 @@ type VODInfo struct {
 	Runtime        string    `json:"runtime,omitempty"`
 	Status         string    `json:"status"`
 	TmdbID         FlexInt   `json:"tmdb_id"`
+	TvdbID         FlexInt   `json:"tvdb_id,omitempty"`
 	Year           FlexInt   `json:"year,omitempty"`
 	YoutubeTrailer string    `json:"youtube_trailer"`
+}
+
+// vodInfoAlias prevents UnmarshalJSON recursion.
+type vodInfoAlias VODInfo
+
+// UnmarshalJSON coalesces provider key variants:
+//   - releasedate / release_date — struct uses releasedate; C emits release_date
+//   - tmdb / tmdb_id, imdb / imdb_id, tvdb / tvdb_id — long form is canonical
+//     on this struct (matches existing tmdb_id precedent across providers);
+//     short forms accepted for cross-provider tolerance.
+func (v *VODInfo) UnmarshalJSON(b []byte) error {
+	type wire struct {
+		*vodInfoAlias
+		ReleaseDateSnake string  `json:"release_date"`
+		TmdbAlt          FlexInt `json:"tmdb"`
+		ImdbAlt          string  `json:"imdb"`
+		TvdbAlt          FlexInt `json:"tvdb"`
+	}
+	w := wire{vodInfoAlias: (*vodInfoAlias)(v)}
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	if v.ReleaseDate == "" {
+		v.ReleaseDate = w.ReleaseDateSnake
+	}
+	if v.TmdbID.Int64() == 0 {
+		v.TmdbID = w.TmdbAlt
+	}
+	if v.ImdbID == "" {
+		v.ImdbID = w.ImdbAlt
+	}
+	if v.TvdbID.Int64() == 0 {
+		v.TvdbID = w.TvdbAlt
+	}
+	return nil
 }
 
 // VODMovieData is the stream identity block within a VideoOnDemandInfo response.
