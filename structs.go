@@ -90,7 +90,7 @@ type SeriesInfo struct {
 	Name           string           `json:"name"`
 	Num            FlexInt          `json:"num"`
 	Plot           string           `json:"plot"`
-	Rating         FlexInt          `json:"rating"`
+	Rating         FlexFloat        `json:"rating"`
 	Rating5        FlexFloat        `json:"rating_5based"`
 	ReleaseDate    string           `json:"releaseDate"`
 	SeriesID       FlexInt          `json:"series_id"`
