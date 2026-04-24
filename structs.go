@@ -191,20 +191,25 @@ type VODInfo struct {
 	Bitrate        FlexInt   `json:"bitrate"`
 	Cast           string    `json:"cast"`
 	Country        string    `json:"country"`
+	Cover          string    `json:"cover,omitempty"`
 	CoverBig       string    `json:"cover_big"`
 	Description    string    `json:"description"`
 	Director       string    `json:"director"`
 	Duration       string    `json:"duration"`
 	DurationSecs   FlexInt   `json:"duration_secs"`
+	EpisodeRunTime *FlexInt  `json:"episode_run_time,omitempty"`
 	Genre          string    `json:"genre"`
+	KinopoiskURL   string    `json:"kinopoisk_url,omitempty"`
 	MovieImage     string    `json:"movie_image"`
 	Name           string    `json:"name"`
 	OriginalName   string    `json:"o_name"`
 	Plot           string    `json:"plot"`
 	Rating         FlexFloat `json:"rating"`
 	ReleaseDate    string    `json:"releasedate"`
+	Runtime        string    `json:"runtime,omitempty"`
 	Status         string    `json:"status"`
 	TmdbID         FlexInt   `json:"tmdb_id"`
+	Year           FlexInt   `json:"year,omitempty"`
 	YoutubeTrailer string    `json:"youtube_trailer"`
 }
 
