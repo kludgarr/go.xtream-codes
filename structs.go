@@ -135,7 +135,7 @@ type SeriesEpisode struct {
 	CustomSid          string      `json:"custom_sid"`
 	DirectSource       string      `json:"direct_source"`
 	EpisodeNum         FlexInt     `json:"episode_num"`
-	ID                 string      `json:"id"`
+	ID                 FlexInt     `json:"id"`
 	Info               EpisodeInfo `json:"info"`
 	Season             FlexInt     `json:"season"`
 	Title              string      `json:"title"`
