@@ -65,15 +65,18 @@ type Stream struct {
 	Icon               string             `json:"stream_icon"`
 	ID                 FlexInt            `json:"stream_id"`
 	IsAdult            ConvertibleBoolean `json:"is_adult"`
+	Live               ConvertibleBoolean `json:"live"`
 	Name               string             `json:"name"`
 	Number             FlexInt            `json:"num"`
 	Rating             FlexFloat          `json:"rating"`
 	Rating5based       FlexFloat          `json:"rating_5based"`
+	SeriesNo           *FlexInt           `json:"series_no,omitempty"`
 	TmdbID             FlexInt            `json:"tmdb,omitempty"`
 	Trailer            string             `json:"trailer,omitempty"`
-	TVArchive          FlexInt            `json:"tv_archive"`
+	TVArchive          ConvertibleBoolean `json:"tv_archive"`
 	TVArchiveDuration  *FlexInt           `json:"tv_archive_duration"`
 	Type               string             `json:"stream_type"`
+	TypeName           string             `json:"type_name,omitempty"`
 }
 
 // SeriesInfo contains information about a TV series.
