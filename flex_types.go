@@ -25,13 +25,14 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON converts the int or string to a Unix timestamp.
 func (t *Timestamp) UnmarshalJSON(b []byte) error {
-	// Timestamps are sometimes quoted, sometimes not, lets just always remove quotes just in case...
-	t.quoted = strings.Contains(string(b), `"`)
-	ts, err := strconv.Atoi(strings.Replace(string(b), `"`, "", -1))
+	b = bytes.TrimSpace(b)
+	t.quoted = len(b) > 0 && b[0] == '"'
+	s := strings.Trim(string(b), `"`)
+	ts, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return err
 	}
-	t.Time = time.Unix(int64(ts), 0)
+	t.Time = time.Unix(ts, 0)
 	return nil
 }
 
@@ -68,8 +69,9 @@ func (bit ConvertibleBoolean) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON converts a 0, 1, true or false into a bool
 func (bit *ConvertibleBoolean) UnmarshalJSON(data []byte) error {
-	bit.quoted = strings.Contains(string(data), `"`)
-	asString := strings.ReplaceAll(string(data), `"`, "")
+	data = bytes.TrimSpace(data)
+	bit.quoted = len(data) > 0 && data[0] == '"'
+	asString := strings.Trim(string(data), `"`)
 	switch asString {
 	case "1", "true":
 		bit.bool = true
@@ -180,6 +182,9 @@ func (b JSONStringSlice) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON sets *b to a copy of data.
 func (b *JSONStringSlice) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 {
+		return nil
+	}
 	if data[0] == '"' {
 		data = append([]byte(`[`), data...)
 		data = append(data, []byte(`]`)...)
