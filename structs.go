@@ -7,18 +7,20 @@ import "encoding/json"
 
 // ServerInfo describes the state of the Xtream-Codes server.
 type ServerInfo struct {
-	HTTPSPort    FlexInt   `json:"https_port"`
-	Port         FlexInt   `json:"port"`
-	Process      bool      `json:"process"`
-	RTMPPort     FlexInt   `json:"rtmp_port"`
-	Protocol     string    `json:"server_protocol"`
-	TimeNow      string    `json:"time_now"`
-	TimestampNow Timestamp `json:"timestamp_now,string"`
-	Timezone     string    `json:"timezone"`
-	URL          string    `json:"url"`
-	Version      string    `json:"version,omitempty"`
-	Revision     string    `json:"revision,omitempty"`
-	XUI          bool      `json:"xui,omitempty"`
+	HTTPSPort    FlexInt            `json:"https_port"`
+	IE           ConvertibleBoolean `json:"ie,omitempty"`
+	IEAuth       ConvertibleBoolean `json:"ie_auth,omitempty"`
+	Port         FlexInt            `json:"port"`
+	Process      bool               `json:"process"`
+	RTMPPort     FlexInt            `json:"rtmp_port"`
+	Protocol     string             `json:"server_protocol"`
+	TimeNow      string             `json:"time_now"`
+	TimestampNow Timestamp          `json:"timestamp_now,string"`
+	Timezone     string             `json:"timezone"`
+	URL          string             `json:"url"`
+	Version      string             `json:"version,omitempty"`
+	Revision     string             `json:"revision,omitempty"`
+	XUI          bool               `json:"xui,omitempty"`
 }
 
 // UserInfo is the current state of the user as it relates to the Xtream-Codes server.
@@ -32,6 +34,7 @@ type UserInfo struct {
 	MaxConnections       FlexInt            `json:"max_connections"`
 	Message              string             `json:"message"`
 	Password             string             `json:"password"`
+	PlaylistName         string             `json:"playlist_name,omitempty"`
 	Status               string             `json:"status"`
 	Username             string             `json:"username"`
 }
@@ -81,6 +84,7 @@ type Stream struct {
 
 // SeriesInfo contains information about a TV series.
 type SeriesInfo struct {
+	Added          *Timestamp       `json:"added,omitempty"`
 	BackdropPath   *JSONStringSlice `json:"backdrop_path,omitempty"`
 	Cast           string           `json:"cast"`
 	CategoryID     *FlexInt         `json:"category_id"`
