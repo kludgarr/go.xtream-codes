@@ -12,7 +12,7 @@ import (
 	"strconv"
 )
 
-var defaultUserAgent = "go.xstream-codes (Go-http-client/1.1)"
+var defaultUserAgent = "go.xtream-codes (Go-http-client/1.1)"
 
 // XtreamClient is the client used to communicate with a Xtream-Codes server.
 type XtreamClient struct {
@@ -148,13 +148,15 @@ func (c *XtreamClient) GetCategories(catType string) ([]Category, error) {
 
 	cats := make([]Category, 0)
 
-	jsonErr := json.Unmarshal(catData, &cats)
+	if err := json.Unmarshal(catData, &cats); err != nil {
+		return nil, err
+	}
 
 	for idx := range cats {
 		cats[idx].Type = catType
 	}
 
-	return cats, jsonErr
+	return cats, nil
 }
 
 // GetLiveStreams will return a slice of live streams.
@@ -236,10 +238,11 @@ func (c *XtreamClient) GetSeriesInfo(seriesID string) (*Series, error) {
 	}
 
 	seriesInfo := &Series{}
+	if err := json.Unmarshal(seriesData, &seriesInfo); err != nil {
+		return nil, err
+	}
 
-	jsonErr := json.Unmarshal(seriesData, &seriesInfo)
-
-	return seriesInfo, jsonErr
+	return seriesInfo, nil
 }
 
 // GetVideoOnDemandInfo will return VOD info for the given vodID.
@@ -254,10 +257,11 @@ func (c *XtreamClient) GetVideoOnDemandInfo(vodID string) (*VideoOnDemandInfo, e
 	}
 
 	vodInfo := &VideoOnDemandInfo{}
+	if err := json.Unmarshal(vodData, &vodInfo); err != nil {
+		return nil, err
+	}
 
-	jsonErr := json.Unmarshal(vodData, &vodInfo)
-
-	return vodInfo, jsonErr
+	return vodInfo, nil
 }
 
 // GetShortEPG returns a short version of the EPG for the given streamID. If no limit is provided, the next 4 items in the EPG will be returned.
@@ -296,10 +300,11 @@ func (c *XtreamClient) getEPG(action, streamID string, limit int) ([]EPGInfo, er
 	}
 
 	epgContainer := &epgContainer{}
+	if err := json.Unmarshal(epgData, &epgContainer); err != nil {
+		return nil, err
+	}
 
-	jsonErr := json.Unmarshal(epgData, &epgContainer)
-
-	return epgContainer.EPGListings, jsonErr
+	return epgContainer.EPGListings, nil
 }
 
 func (c *XtreamClient) sendRequest(action string, parameters url.Values) ([]byte, error) {
@@ -307,22 +312,20 @@ func (c *XtreamClient) sendRequest(action string, parameters url.Values) ([]byte
 	if action == "xmltv.php" {
 		file = action
 	}
-	url := fmt.Sprintf("%s/%s?username=%s&password=%s", c.BaseURL, file, c.Username, c.Password)
+	requestURL := fmt.Sprintf("%s/%s?username=%s&password=%s", c.BaseURL, file, c.Username, c.Password)
 	if action != "" {
-		url = fmt.Sprintf("%s&action=%s", url, action)
+		requestURL = fmt.Sprintf("%s&action=%s", requestURL, action)
 	}
 	if parameters != nil {
-		url = fmt.Sprintf("%s&%s", url, parameters.Encode())
+		requestURL = fmt.Sprintf("%s&%s", requestURL, parameters.Encode())
 	}
 
-	request, httpErr := http.NewRequest("GET", url, nil)
+	request, httpErr := http.NewRequestWithContext(c.Context, "GET", requestURL, nil)
 	if httpErr != nil {
 		return nil, httpErr
 	}
 
 	request.Header.Set("User-Agent", c.UserAgent)
-
-	request = request.WithContext(c.Context)
 
 	response, httpErr := c.HTTP.Do(request)
 	if httpErr != nil {
