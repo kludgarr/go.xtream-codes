@@ -16,3 +16,9 @@
 # workspace, not the library repo. Skipped silently when sample data is
 # absent, so it added no CI value but did show up in `go test` runs.
 provider_validation_test.go
+
+# CircleCI config — modernized but still pinned to the tellytv module
+# path in working_directory; couples with the GX06 publish-step namespace
+# rename. Gitignored until publish-time, when the rename + CircleCI
+# wiring land together.
+.circleci/
