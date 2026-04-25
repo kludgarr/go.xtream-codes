@@ -391,13 +391,13 @@ func (c *XtreamClient) sendRequest(action string, parameters url.Values) ([]byte
 
 	response, httpErr := c.HTTP.Do(request)
 	if httpErr != nil {
-		return nil, fmt.Errorf("cannot reach server. %v", httpErr)
+		return nil, fmt.Errorf("cannot reach server: %w", httpErr)
 	}
 	defer response.Body.Close()
 
 	body, readErr := io.ReadAll(response.Body)
 	if readErr != nil {
-		return nil, fmt.Errorf("cannot read response. %v", readErr)
+		return nil, fmt.Errorf("cannot read response: %w", readErr)
 	}
 
 	contentType := response.Header.Get("Content-Type")

@@ -8,8 +8,8 @@ import "encoding/json"
 // ServerInfo describes the state of the Xtream-Codes server.
 type ServerInfo struct {
 	HTTPSPort    FlexInt            `json:"https_port"`
-	IE           ConvertibleBoolean `json:"ie,omitempty"`
-	IEAuth       ConvertibleBoolean `json:"ie_auth,omitempty"`
+	IE           ConvertibleBoolean `json:"ie,omitzero"`
+	IEAuth       ConvertibleBoolean `json:"ie_auth,omitzero"`
 	Port         FlexInt            `json:"port"`
 	Process      bool               `json:"process"`
 	RTMPPort     FlexInt            `json:"rtmp_port"`
@@ -77,7 +77,7 @@ type Stream struct {
 	SeriesNo           *FlexInt           `json:"series_no,omitempty"`
 	TmdbID             FlexInt            `json:"tmdb,omitempty"`
 	Trailer            string             `json:"trailer,omitempty"`
-	TvdbID             FlexInt            `json:"tvdb,omitempty"`
+	TvdbID             FlexInt            `json:"tvdb,omitzero"`
 	TVArchive          ConvertibleBoolean `json:"tv_archive"`
 	TVArchiveDuration  *FlexInt           `json:"tv_archive_duration"`
 	Type               string             `json:"stream_type"`
@@ -135,7 +135,7 @@ type SeriesInfo struct {
 	SeriesID       FlexInt          `json:"series_id"`
 	StreamType     string           `json:"stream_type"`
 	TmdbID         FlexInt          `json:"tmdb,omitempty"`
-	TvdbID         FlexInt          `json:"tvdb,omitempty"`
+	TvdbID         FlexInt          `json:"tvdb,omitzero"`
 	YoutubeTrailer string           `json:"youtube_trailer"`
 }
 
@@ -193,7 +193,7 @@ type EpisodeInfo struct {
 	Rating         FlexFloat        `json:"rating"`
 	ReleaseDate    string           `json:"releasedate"`
 	TmdbID         FlexInt          `json:"tmdb_id,omitempty"`
-	TvdbID         FlexInt          `json:"tvdb_id,omitempty"`
+	TvdbID         FlexInt          `json:"tvdb_id,omitzero"`
 }
 
 // episodeInfoAlias prevents UnmarshalJSON recursion.
@@ -242,7 +242,7 @@ type SeriesEpisode struct {
 	Season             FlexInt     `json:"season"`
 	Title              string      `json:"title"`
 	TmdbID             FlexInt     `json:"tmdb,omitempty"`
-	TvdbID             FlexInt     `json:"tvdb,omitempty"`
+	TvdbID             FlexInt     `json:"tvdb,omitzero"`
 }
 
 // seriesEpisodeAlias prevents UnmarshalJSON recursion.
@@ -287,7 +287,7 @@ type Season struct {
 	ReleaseDate  string  `json:"releaseDate"`
 	SeasonNumber FlexInt `json:"season_number"`
 	TmdbID       FlexInt `json:"tmdb,omitempty"`
-	TvdbID       FlexInt `json:"tvdb,omitempty"`
+	TvdbID       FlexInt `json:"tvdb,omitzero"`
 }
 
 // seasonAlias prevents UnmarshalJSON recursion.
@@ -356,7 +356,7 @@ type VODInfo struct {
 	Runtime        string    `json:"runtime,omitempty"`
 	Status         string    `json:"status"`
 	TmdbID         FlexInt   `json:"tmdb_id"`
-	TvdbID         FlexInt   `json:"tvdb_id,omitempty"`
+	TvdbID         FlexInt   `json:"tvdb_id,omitzero"`
 	Year           FlexInt   `json:"year,omitempty"`
 	YoutubeTrailer string    `json:"youtube_trailer"`
 }
@@ -428,8 +428,12 @@ func (v *VideoOnDemandInfo) UnmarshalJSON(b []byte) error {
 	}
 	if len(w.Info) > 0 {
 		if err := json.Unmarshal(w.Info, &v.Info); err != nil {
-			var placeholder []struct{}
-			if arrErr := json.Unmarshal(w.Info, &placeholder); arrErr != nil {
+			// Tolerate "info": [] specifically — the empty-array sentinel
+			// some providers emit when the metadata block is absent.
+			// A non-empty array is real data we don't know how to shape;
+			// surface the original error rather than silently dropping it.
+			var placeholder []json.RawMessage
+			if arrErr := json.Unmarshal(w.Info, &placeholder); arrErr != nil || len(placeholder) != 0 {
 				return err
 			}
 		}

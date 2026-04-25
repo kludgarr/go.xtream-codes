@@ -45,6 +45,12 @@ type ConvertibleBoolean struct {
 // Bool returns the underlying bool value.
 func (bit ConvertibleBoolean) Bool() bool { return bit.bool }
 
+// IsZero reports whether the ConvertibleBoolean holds the zero value
+// (false, unquoted). Combined with json `omitzero` (Go 1.24+) for
+// targeted elision; do not apply to fields where false-vs-absent is a
+// distinction the caller relies on.
+func (bit ConvertibleBoolean) IsZero() bool { return !bit.bool && !bit.quoted }
+
 // String implements fmt.Stringer.
 func (bit ConvertibleBoolean) String() string {
 	if bit.bool {
@@ -92,6 +98,12 @@ type FlexInt struct {
 
 // NewFlexInt creates a FlexInt from an int64 value.
 func NewFlexInt(v int64) FlexInt { return FlexInt{value: v} }
+
+// IsZero reports whether the FlexInt holds the zero value. Combined with
+// the json `omitzero` tag (Go 1.24+), this allows targeted elision of
+// absent-equals-zero fields without affecting fields where a zero value
+// carries semantic signal.
+func (f FlexInt) IsZero() bool { return f.value == 0 }
 
 // Int64 returns the underlying int64 value.
 func (f FlexInt) Int64() int64 { return f.value }
