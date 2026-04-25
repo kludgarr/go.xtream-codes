@@ -109,6 +109,12 @@ func (f FlexInt) MarshalJSON() ([]byte, error) {
 	return json.Marshal(f.value)
 }
 
+// UnmarshalJSON is intentionally tolerant: malformed numerics coerce to
+// zero rather than failing the enclosing record's decode. Providers in the
+// wild emit empty strings, nulls, and occasional non-numeric strings on
+// fields the contract treats as integers; record-level decode failure is
+// worse than zero-coercion in this domain. Callers that need to distinguish
+// "explicit zero" from "coerced bad input" should validate at a higher level.
 func (f *FlexInt) UnmarshalJSON(data []byte) error {
 	data = bytes.TrimSpace(data)
 	f.quoted = len(data) > 0 && data[0] == '"'

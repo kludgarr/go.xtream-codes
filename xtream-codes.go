@@ -15,11 +15,13 @@ import (
 
 var defaultUserAgent = "go.xtream-codes (Go-http-client/1.1)"
 
-// HTTPError is returned by the Xtream API client when a request returns a
-// non-2xx HTTP status, or when a 2xx response body fails the non-JSON error
-// heuristic (empty body, leading '<' for HTML, common plain-text sentinels).
-// Callers can type-assert to access StatusCode, ContentType, and Body for
-// diagnostic inspection.
+// HTTPError is returned by the Xtream API client when a request returns an
+// HTTP status >= 400, or when a 2xx response body for a JSON-expected
+// endpoint fails the non-JSON error heuristic (empty body, leading '<' for
+// HTML, exact-match sentinel words). 3xx redirects are followed by the
+// underlying http.Client and do not surface as HTTPError. Callers can
+// type-assert to access StatusCode, ContentType, and Body for diagnostic
+// inspection.
 type HTTPError struct {
 	StatusCode  int
 	ContentType string
@@ -360,12 +362,20 @@ func (c *XtreamClient) getEPG(action, streamID string, limit int) ([]EPGInfo, er
 }
 
 func (c *XtreamClient) sendRequest(action string, parameters url.Values) ([]byte, error) {
+	// XMLTV is exposed at /xmltv.php directly — the file path encodes the
+	// endpoint, so no &action query param is appended (and no JSON-shape
+	// expectation applies on the response — see the heuristic guard below).
+	xmltvEndpoint := action == "xmltv.php"
 	file := "player_api.php"
-	if action == "xmltv.php" {
+	if xmltvEndpoint {
 		file = action
 	}
+	// Username/password are interpolated unescaped: empirically, Xtream
+	// credentials are uniformly [a-zA-Z0-9]{10} across providers and the
+	// upstream/Dispatcharr clients use the same raw concatenation. Revisit
+	// if a provider ever issues credentials with reserved URL characters.
 	requestURL := fmt.Sprintf("%s/%s?username=%s&password=%s", c.BaseURL, file, c.Username, c.Password)
-	if action != "" {
+	if action != "" && !xmltvEndpoint {
 		requestURL = fmt.Sprintf("%s&action=%s", requestURL, action)
 	}
 	if parameters != nil {
@@ -400,11 +410,12 @@ func (c *XtreamClient) sendRequest(action string, parameters url.Values) ([]byte
 		}
 	}
 
-	// Heuristic: 2xx responses that clearly aren't JSON. Sentinel list is
-	// sourced secondhand from Dispatcharr's Python XC client and is not
-	// empirically validated against our own captures; tighten when we have
-	// concrete examples of the failure modes in our sample data.
-	if isNonJSONErrorBody(body) {
+	// Heuristic: 2xx responses that clearly aren't JSON, applied only to
+	// JSON-expected endpoints. Skipped for /xmltv.php since XMLTV payloads
+	// legitimately start with '<'. The sentinel list is exact-match and is
+	// sourced secondhand from Dispatcharr's Python XC client; tighten when
+	// we have concrete examples of the failure modes in our sample data.
+	if !xmltvEndpoint && isNonJSONErrorBody(body) {
 		return nil, &HTTPError{
 			StatusCode:  response.StatusCode,
 			ContentType: contentType,
@@ -415,6 +426,11 @@ func (c *XtreamClient) sendRequest(action string, parameters url.Values) ([]byte
 	return body, nil
 }
 
+// isNonJSONErrorBody flags 2xx responses that clearly aren't JSON: empty
+// body, leading '<' (HTML/XML error page), or an exact-match against a
+// short list of plain-text sentinels. The sentinel match is bytes.Equal
+// (whole body, case-folded) — not substring-match — to keep false-positive
+// risk low against legitimate JSON payloads that contain these words.
 func isNonJSONErrorBody(body []byte) bool {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {
