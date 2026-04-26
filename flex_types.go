@@ -28,6 +28,9 @@ func (t *Timestamp) UnmarshalJSON(b []byte) error {
 	b = bytes.TrimSpace(b)
 	t.quoted = len(b) > 0 && b[0] == '"'
 	s := strings.Trim(string(b), `"`)
+	if len(s) == 0 {
+		return nil
+	}
 	ts, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return err

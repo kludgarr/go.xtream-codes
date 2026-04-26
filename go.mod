@@ -1,3 +1,3 @@
-module github.com/tellytv/go.xtream-codes
+module github.com/warrentc3/go.xtream-codes
 
 go 1.26
